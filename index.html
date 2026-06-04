@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Inhale — Protocole de Sevrage</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#020617">
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-title" content="Inhale">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/inhale/sw.js');
+      }
+    </script>
+    <!-- /PWA -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+        /* Date picker — icône claire sur fond sombre */
+        input[type="date"] { color-scheme: dark; color: #e2e8f0; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(2); cursor: pointer; opacity: 0.8; }
+        /* Breathing */
+        .breathing-circle { transition: transform 5s linear, background-color 2s ease; }
+        .inhale { transform: scale(2.2); background-color: rgba(56,189,248,0.25); box-shadow: 0 0 50px rgba(56,189,248,0.4); }
+        .exhale { transform: scale(1.0); background-color: rgba(45,212,191,0.15); box-shadow: 0 0 30px rgba(45,212,191,0.2); }
+        /* Onboarding */
+        #onboarding-screen { position: fixed; inset: 0; background: #020617; z-index: 1000; overflow-y: auto; padding: 48px 20px 40px; }
+        /* Accordion */
+        .day-content { display: none; }
+        .day-card.open .day-content { display: block; }
+        .day-card.locked { opacity: 0.45; pointer-events: none; }
+        /* Dark inputs */
+        .dark-input { width: 100%; background: rgba(15,23,42,0.8); border: 1px solid rgba(148,163,184,0.15); border-radius: 10px; padding: 12px; color: #e2e8f0; font-size: 0.875rem; outline: none; resize: vertical; transition: border 0.2s; margin-top: 6px; margin-bottom: 14px; display: block; }
+        .dark-input:focus { border-color: rgba(56,189,248,0.4); }
+        select.dark-input option { background: #0f172a; }
+        input.dark-input { resize: none; }
+        /* Badges */
+        .badge-done { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+        .badge-todo { background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+        .badge-locked { background: rgba(100,116,139,0.12); color: #64748b; border: 1px solid rgba(100,116,139,0.2); }
+        /* Animations */
+        .dynamic-view { animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* Checkbox row */
+        .check-row { display: flex; align-items: flex-start; gap: 12px; background: rgba(148,163,184,0.06); border: 1px solid rgba(148,163,184,0.1); border-radius: 12px; padding: 14px; margin: 14px 0; }
+        .check-row input[type="checkbox"] { margin-top: 3px; accent-color: #38bdf8; transform: scale(1.15); flex-shrink: 0; }
+        .check-row label { font-size: 0.85rem; color: #94a3b8; line-height: 1.5; cursor: pointer; }
+        /* Table */
+        .dark-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.85rem; }
+        .dark-table th { background: rgba(56,189,248,0.08); color: #7dd3fc; font-weight: 600; padding: 10px 12px; text-align: left; border-bottom: 1px solid rgba(56,189,248,0.15); }
+        .dark-table td { padding: 9px 12px; color: #cbd5e1; border-bottom: 1px solid rgba(148,163,184,0.08); }
+        /* Blockquote */
+        .dark-quote { border-left: 3px solid rgba(56,189,248,0.4); padding: 12px 14px; background: rgba(56,189,248,0.04); border-radius: 0 10px 10px 0; font-style: italic; color: #94a3b8; font-size: 0.875rem; margin: 16px 0; line-height: 1.6; }
+        input[type="range"] { accent-color: #38bdf8; }
+    </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden antialiased selection:bg-sky-500/30">
+
+<div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+    <div class="absolute -top-[40%] -left-[20%] w-[80%] h-[60%] rounded-full bg-sky-500/10 blur-[120px]"></div>
+    <div class="absolute bottom-[10%] -right-[20%] w-[80%] h-[60%] rounded-full bg-teal-500/10 blur-[120px]"></div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="onboarding-screen">
+    <div class="max-w-md mx-auto space-y-6">
+        <div class="text-center mb-8">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">Bienvenue</p>
+            <h1 class="text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Inhale</h1>
+            <p class="text-sm text-slate-500 mt-2">Protocole de sevrage tabagique — 7 jours</p>
+        </div>
+
+        <!-- Étape 1 -->
+        <div id="ob-step-1" class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
+            <p class="text-xs font-semibold uppercase tracking-widest text-sky-400 mb-1">Protocole</p>
+            <h2 class="text-xl font-bold text-white mb-4">Votre accompagnement</h2>
+            <p class="text-sm text-slate-400 leading-relaxed mb-3">Ce livret vous propose une activité par jour entre vos deux séances d'Hypnose de Sevrage Tabagique. Vous y trouverez des informations pratiques ainsi que des conseils et des petits exercices. Cela vous prendra <strong class="text-slate-200">moins de 5 minutes par jour</strong>.</p>
+            <p class="text-sm text-slate-400 leading-relaxed mb-3">L'idée est de permettre à votre Conscient d'envoyer un message clair à votre Inconscient (qui a déjà commencé son travail après avoir participé activement à la première séance d'Hypnose, vous pouvez lui faire confiance !) : <strong class="text-sky-300">Je me libère de la cigarette !</strong></p>
+            <p class="text-sm text-slate-400 leading-relaxed">Laissez-vous aller cette semaine : ne limitez pas volontairement votre consommation, laissez tranquillement les choses se faire, sans culpabilité. Par contre, je vous invite à prendre le tableau que vous compléterez avant notre prochaine rencontre et à le continuer si vous avez encore envie de prendre une cigarette.</p>
+            <div class="check-row mt-5">
+                <input type="checkbox" id="chk-ob1" onchange="toggleObBtn('ob-btn1', this)">
+                <label for="chk-ob1">J'ai lu attentivement cette introduction</label>
+            </div>
+            <button id="ob-btn1" disabled onclick="obNextStep(2)"
+                class="w-full mt-2 py-4 rounded-2xl font-semibold text-sm tracking-wide transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-slate-800 border border-slate-700 text-slate-400 enabled:bg-gradient-to-r enabled:from-sky-500 enabled:to-teal-400 enabled:text-slate-950 enabled:border-transparent enabled:shadow-[0_0_30px_rgba(56,189,248,0.3)]">
+                Continuer
+            </button>
+        </div>
+
+        <!-- Étape 2 -->
+        <div id="ob-step-2" class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-3xl p-6 shadow-2xl backdrop-blur-xl hidden">
+            <p class="text-xs font-semibold uppercase tracking-widest text-sky-400 mb-1">Savoir</p>
+            <h2 class="text-xl font-bold text-white mb-4">Évolution après votre dernière cigarette</h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex gap-3"><span class="text-sky-400 font-bold w-24 flex-shrink-0">20 min</span><span class="text-slate-400">La pression sanguine et les pulsations du cœur redeviennent normales.</span></div>
+                <div class="flex gap-3"><span class="text-sky-400 font-bold w-24 flex-shrink-0">8 heures</span><span class="text-slate-400">La quantité de monoxyde de carbone dans le sang diminue de moitié.</span></div>
+                <div class="flex gap-3"><span class="text-sky-400 font-bold w-24 flex-shrink-0">24 heures</span><span class="text-slate-400">Le corps ne contient plus de nicotine. Les poumons commencent à éliminer le mucus.</span></div>
+                <div class="flex gap-3"><span class="text-sky-400 font-bold w-24 flex-shrink-0">48 heures</span><span class="text-slate-400">Le goût et l'odorat s'améliorent.</span></div>
+                <div class="flex gap-3"><span class="text-sky-400 font-bold w-24 flex-shrink-0">72 heures</span><span class="text-slate-400">Respirer devient plus facile, les bronches se relâchent.</span></div>
+                <div class="flex gap-3"><span class="text-teal-400 font-bold w-24 flex-shrink-0">2–3 mois</span><span class="text-slate-400">La toux diminue et vous récupérez du souffle.</span></div>
+                <div class="flex gap-3"><span class="text-teal-400 font-bold w-24 flex-shrink-0">1–9 mois</span><span class="text-slate-400">Les cils bronchiques repoussent. Moins d'essoufflement.</span></div>
+                <div class="flex gap-3"><span class="text-teal-400 font-bold w-24 flex-shrink-0">1 an</span><span class="text-slate-400">Le risque d'infarctus diminue de moitié.</span></div>
+                <div class="flex gap-3"><span class="text-emerald-400 font-bold w-24 flex-shrink-0">5 ans</span><span class="text-slate-400">Le risque de cancer du poumon diminue presque de moitié.</span></div>
+                <div class="flex gap-3"><span class="text-emerald-400 font-bold w-24 flex-shrink-0">10–15 ans</span><span class="text-slate-400">L'espérance de vie redevient identique à celle d'un non-fumeur.</span></div>
+            </div>
+            <div class="check-row mt-5">
+                <input type="checkbox" id="chk-ob2" onchange="toggleObBtn('ob-btn2', this)">
+                <label for="chk-ob2">Je m'engage pleinement dans ma démarche</label>
+            </div>
+            <button id="ob-btn2" disabled onclick="obNextStep(3)"
+                class="w-full mt-2 py-4 rounded-2xl font-semibold text-sm tracking-wide transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer bg-slate-800 border border-slate-700 text-slate-400 enabled:bg-gradient-to-r enabled:from-sky-500 enabled:to-teal-400 enabled:text-slate-950 enabled:border-transparent enabled:shadow-[0_0_30px_rgba(56,189,248,0.3)]">
+                Continuer
+            </button>
+        </div>
+
+        <!-- Étape 3 -->
+        <div id="ob-step-3" class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-3xl p-6 shadow-2xl backdrop-blur-xl hidden">
+            <p class="text-xs font-semibold uppercase tracking-widest text-sky-400 mb-1">Configuration</p>
+            <h2 class="text-xl font-bold text-white mb-4">Paramètres de votre suivi</h2>
+            <p class="text-sm text-slate-400 mb-5">Configurez vos données initiales pour calibrer les indicateurs de l'application :</p>
+            <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Date de votre première séance</label>
+            <input type="date" id="init-date-rdv" value="2026-06-02" class="dark-input">
+            <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Consommation habituelle (cigarettes / jour)</label>
+            <input type="number" id="init-cig-day" value="20" min="1" class="dark-input">
+            <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Prix moyen d'un paquet de 20 (€)</label>
+            <input type="number" id="init-cig-price" value="12.50" step="0.1" class="dark-input">
+            <button onclick="finishOnboarding()"
+                class="w-full mt-2 py-4 rounded-2xl bg-gradient-to-r from-sky-500 to-teal-400 text-slate-950 font-bold text-sm tracking-wide shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] transition-all cursor-pointer active:scale-98">
+                Accéder à l'application →
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<main id="main-app" class="flex-1 overflow-y-auto px-5 pt-12 pb-28 max-w-md mx-auto w-full hidden">
+
+    <!-- SUIVI -->
+    <section id="view-suivi" class="space-y-8 dynamic-view">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Votre progression</p>
+                <h1 class="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Suivi Journalier</h1>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-3xl p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+            <p class="text-sm font-medium text-slate-400">Cigarettes aujourd'hui</p>
+            <div class="flex items-baseline gap-2 mt-2">
+                <span id="global-counter" class="text-6xl font-black tracking-tight text-white transition-all duration-300">0</span>
+                <span class="text-lg font-medium text-slate-500">fumée(s)</span>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-800/60 flex justify-between text-xs text-slate-400">
+                <span id="last-smoke-time">Première saisie requise</span>
+                <span class="text-emerald-400 font-medium">Objectif : Réduction</span>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center py-2">
+            <button id="btn-add-smoke" onclick="openModalStep1()"
+                class="w-32 h-32 rounded-full bg-gradient-to-tr from-sky-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-[0_0_50px_rgba(56,189,248,0.3)] hover:shadow-[0_0_60px_rgba(56,189,248,0.5)] transition-all active:scale-95 cursor-pointer relative">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-14 h-14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+            </button>
+            <p class="text-xs text-slate-400 mt-4 font-medium tracking-wide">Déclarer une cigarette</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-4 backdrop-blur-xl text-center">
+                <div id="stat-evitees" class="text-3xl font-black text-emerald-400">0</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Cig. évitées</div>
+            </div>
+            <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-4 backdrop-blur-xl text-center">
+                <div id="stat-argent" class="text-3xl font-black text-sky-400">0 €</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Préservé</div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-3xl p-5 backdrop-blur-xl shadow-xl">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Courbe de progression</p>
+            <div style="height:180px; position:relative;"><canvas id="progressChart"></canvas></div>
+        </div>
+
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Historique global</h3>
+                <button onclick="clearAllData()" class="text-xs text-slate-600 hover:text-rose-400 transition-colors cursor-pointer">Effacer tout</button>
+            </div>
+            <div id="smoke-history-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+        </div>
+    </section>
+
+    <!-- PROGRAMME -->
+    <section id="view-programme" class="space-y-4 dynamic-view hidden">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">7 jours</p>
+            <h1 class="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Programme</h1>
+        </div>
+
+        <!-- J1 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-1">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(1)">
+                <span class="text-sm font-semibold text-slate-200">Jour 1 — Le bâton et la carotte</span>
+                <span id="badge-j1" class="badge-todo text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">En cours</span>
+            </div>
+            <div class="day-content px-4 pb-5 space-y-3 border-t border-slate-800/40 pt-4">
+                <p class="text-sm text-slate-400 leading-relaxed">Votre décision de vous libérer du tabac est prise ! D'un point de vue psychologique, votre motivation est entièrement basée sur le <strong class="text-slate-200">bâton</strong> (tout ce que vous risquez si vous continuez) et la <strong class="text-slate-200">carotte</strong> (tout ce que vous allez gagner en arrêtant).</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-rose-400 mt-2">Le bâton — Scénario du pire</p>
+                <p class="text-sm text-slate-400 leading-relaxed">Notez les désavantages, ennuis, difficultés ou conséquences négatives directes et indirectes que vous et votre entourage pourriez subir en continuant de fumer.</p>
+                <textarea id="j1-baton" class="dark-input" rows="3" placeholder="Saisissez vos réflexions ici..."></textarea>
+                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">La carotte — Scénario de votre libération</p>
+                <p class="text-sm text-slate-400 leading-relaxed">Notez tous les avantages, bénéfices, joies et plaisirs que vous obtiendrez en cessant définitivement de fumer.</p>
+                <textarea id="j1-carotte" class="dark-input" rows="3" placeholder="Saisissez vos motivations ici..."></textarea>
+                <button onclick="validerJour(1)" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le Jour 1</button>
+            </div>
+        </div>
+
+        <!-- J2 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-2">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(2)">
+                <span class="text-sm font-semibold text-slate-200">Jour 2 — Combien ça coûte ?</span>
+                <span id="badge-j2" class="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Bloqué</span>
+            </div>
+            <div class="day-content px-4 pb-5 space-y-3 border-t border-slate-800/40 pt-4">
+                <p class="text-sm text-slate-400 leading-relaxed">Fumer coûte cher. Voici la répartition exacte des taxes prélevées sur chaque paquet de cigarettes :</p>
+                <table class="dark-table">
+                    <thead><tr><th>Bénéficiaire</th><th>Part de la taxe</th></tr></thead>
+                    <tbody>
+                        <tr><td>Buralistes</td><td>8 %</td></tr>
+                        <tr><td>Cigarettiers</td><td>12 %</td></tr>
+                        <tr><td>État</td><td>80 %</td></tr>
+                    </tbody>
+                </table>
+                <p class="text-sm text-slate-400 leading-relaxed">C'est l'État qui prélève la majeure partie de votre argent via cet impôt indirect taxé à 80 %.</p>
+                <div class="dark-quote">« Cette théorie de la dépendance au tabac repose sur des bases si fragiles que je la considère comme une des plus grandes impostures de notre temps. »<br><strong class="text-slate-300">— Professeur Molimard</strong></div>
+                <button onclick="validerJour(2)" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le Jour 2</button>
+            </div>
+        </div>
+
+        <!-- J3 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-3">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(3)">
+                <span class="text-sm font-semibold text-slate-200">Jour 3 — Je veux quoi ?</span>
+                <span id="badge-j3" class="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Bloqué</span>
+            </div>
+            <div class="day-content px-4 pb-5 space-y-3 border-t border-slate-800/40 pt-4">
+                <p class="text-sm text-slate-400 leading-relaxed">Vous allez réaliser des économies majeures. Qu'allez-vous faire de cet argent préservé ?</p>
+                <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Estimation de vos économies annuelles (€)</label>
+                <input type="number" id="j3-montant" placeholder="Ex: 4500" class="dark-input">
+                <p class="text-xs font-semibold uppercase tracking-wider text-sky-400">Vos projets personnels</p>
+                <p class="text-sm text-slate-400 leading-relaxed">Un voyage, un projet de soin, un plaisir marquant ? Ce budget est entièrement dédié à votre propre satisfaction.</p>
+                <textarea id="j3-projets" class="dark-input" rows="3" placeholder="Détaillez vos projets ou rêves ici..."></textarea>
+                <button onclick="validerJour(3)" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le Jour 3</button>
+            </div>
+        </div>
+
+        <!-- J4 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-4">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(4)">
+                <span class="text-sm font-semibold text-slate-200">Jour 4 — Quelles sont mes peurs ?</span>
+                <span id="badge-j4" class="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Bloqué</span>
+            </div>
+            <div class="day-content px-4 pb-5 space-y-3 border-t border-slate-800/40 pt-4">
+                <p class="text-sm text-slate-400 leading-relaxed">La dépendance est essentiellement psychologique et gestuelle. La peur du manque ou de la prise de poids provient souvent d'un réflexe de compensation mécanique (porter quelque chose à la bouche).</p>
+                <p class="text-sm text-slate-400 leading-relaxed">L'hypnose permet de désamorcer ce mécanisme en substituant l'automatisme par des habitudes saines (eau, oxygénation), évitant ainsi la sensation de vide.</p>
+                <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Votre principale peur ou obstacle</label>
+                <textarea id="j4-peur" class="dark-input" rows="2" placeholder="Ex: Gestion du stress, irritabilité..."></textarea>
+                <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Votre solution alternative saine</label>
+                <textarea id="j4-solution" class="dark-input" rows="2" placeholder="Ex: Exercice de respiration, eau fraîche..."></textarea>
+                <button onclick="validerJour(4)" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le Jour 4</button>
+            </div>
+        </div>
+
+        <!-- J5 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-5">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(5)">
+                <span class="text-sm font-semibold text-slate-200">Jour 5 — Un compte liberté !</span>
+                <span id="badge-j5" class="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Bloqué</span>
+            </div>
+            <div class="day-content px-4 pb-5 space-y-3 border-t border-slate-800/40 pt-4">
+                <p class="text-sm text-slate-400 leading-relaxed">Matérialisez votre réussite : ouvrez un compte bancaire secondaire ou un livret d'épargne dédié, qui fera office de <strong class="text-slate-200">compte « liberté »</strong>.</p>
+                <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Montant du virement mensuel programmé (€)</label>
+                <input type="number" id="j5-mensuel" placeholder="Ex: 350" class="dark-input">
+                <div class="check-row">
+                    <input type="checkbox" id="j5-rib">
+                    <label for="j5-rib">Je m'engage à automatiser cette épargne plaisir.</label>
+                </div>
+                <button onclick="validerJour(5)" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le Jour 5</button>
+            </div>
+        </div>
+
+        <!-- J6 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-6">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(6)">
+                <span class="text-sm font-semibold text-slate-200">Jour 6 — Lettre à la cigarette</span>
+                <span id="badge-j6" class="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Bloqué</span>
+            </div>
+            <div class="day-content px-4 pb-5 space-y-3 border-t border-slate-800/40 pt-4">
+                <p class="text-sm text-slate-400 leading-relaxed">Projetez-vous dans 5 ans. Vous êtes définitivement non-fumeur. Rédigez une lettre à la cigarette pour exprimer votre détachement et acter cette rupture définitive.</p>
+                <p class="text-sm text-slate-300 font-medium">Chère Cigarette,</p>
+                <textarea id="j6-lettre" class="dark-input" rows="5" placeholder="Rédigez votre texte ici..."></textarea>
+                <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Signature</label>
+                <input type="text" id="j6-sign" placeholder="Votre prénom" class="dark-input">
+                <button onclick="validerJour(6)" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le Jour 6</button>
+            </div>
+        </div>
+
+        <!-- J7 -->
+        <div class="day-card bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl overflow-hidden backdrop-blur-xl" id="daycard-7">
+            <div class="day-header flex items-center justify-between p-4 cursor-pointer select-none" onclick="toggleDay(7)">
+                <span class="text-sm font-semibold text-slate-200">Jour 7 — Les Dix commandements</span>
+                <span id="badge-j7" class="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Bloqué</span>
+            </div>
+            <div class="day-content px-4 pb-5 border-t border-slate-800/40 pt-4">
+                <ol class="space-y-3 mb-4">
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">1. Loi du tout ou rien :</strong> L'arrêt est total, une seule bouffée réactive le réseau neuronal.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">2. Loi de relaxation :</strong> Brisez les associations rituelles en limitant les excitants au début.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">3. Loi du drainage :</strong> Remplacez la pulsion par une gorgée d'eau bue lentement.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">4. Loi du remplissage :</strong> Vos poumons réclament de l'air, non de la nourriture. Oxygénez-vous.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">5. Loi de la purification :</strong> Privilégiez une alimentation riche en fibres et vitamines.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">6. Loi du « On s'en moque » :</strong> Vous êtes non-fumeur, aucune justification n'est requise.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">7. Loi du déconditionnement :</strong> Éliminez tous les objets liés au tabac de votre environnement.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">8. Loi de l'autosatisfaction :</strong> Savourez la fierté de reprendre le contrôle de votre vie.</li>
+                    <li class="text-sm text-slate-400"><strong class="text-slate-200">9. Loi du silence :</strong> Évitez de faire du prosélytisme autour de vous.</li>
+                </ol>
+                <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">10. Définissez votre propre loi personnelle</label>
+                <input type="text" id="j7-loi" placeholder="Ma dixième loi est..." class="dark-input">
+                <button onclick="validerJour(7)" class="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500/20 to-teal-500/20 hover:from-sky-500/30 hover:to-teal-500/30 border border-sky-500/30 text-sky-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le protocole hebdomadaire ✓</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- RESPIRATION -->
+    <section id="view-respiration" class="space-y-7 dynamic-view hidden">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Cohérence cardiaque</p>
+            <h1 class="text-3xl font-bold tracking-tight text-white">Respiration</h1>
+        </div>
+        <div class="flex justify-center">
+            <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl text-center w-48">
+                <div id="resp-today-count" class="text-4xl font-black text-sky-400">0</div>
+                <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mt-1">Sessions aujourd'hui</div>
+            </div>
+        </div>
+        <div id="resp-config-card" class="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-6 backdrop-blur-xl space-y-4">
+            <div class="flex justify-between items-center">
+                <label class="text-sm font-medium text-slate-300">Durée de l'exercice</label>
+                <span class="text-lg font-bold text-sky-400"><span id="slider-val">5</span> <span class="text-xs font-normal text-slate-500">min</span></span>
+            </div>
+            <input type="range" id="duration-slider" min="1" max="10" value="5" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+            <div class="flex justify-between text-xs text-slate-500 px-1"><span>1 min</span><span>5 min</span><span>10 min</span></div>
+        </div>
+        <div class="flex flex-col items-center justify-center py-6 min-h-[280px]">
+            <div id="timer-display" class="text-2xl font-bold tracking-mono text-slate-400 mb-8 tabular-nums opacity-0 transition-opacity duration-300">05:00</div>
+            <div class="w-40 h-40 flex items-center justify-center rounded-full bg-slate-900 border border-slate-800 shadow-inner">
+                <div id="visual-guide" class="breathing-circle w-16 h-16 rounded-full bg-sky-500/20"></div>
+            </div>
+            <div id="breathing-text" class="text-base font-medium tracking-wide text-slate-400 mt-10 h-6 text-center transition-all">Prêt à commencer ?</div>
+        </div>
+        <div class="flex justify-center">
+            <button id="btn-start-resp" onclick="toggleBreathing()"
+                class="w-full max-w-xs py-4 px-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 text-slate-200 font-semibold text-sm transition-all tracking-wide active:scale-98 shadow-xl cursor-pointer">
+                Commencer la séance
+            </button>
+        </div>
+        <div id="sos-review-box" class="bg-gradient-to-b from-slate-900/80 to-slate-950 border-l-2 border-l-sky-500/40 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl hidden">
+            <p class="text-xs font-semibold uppercase tracking-widest text-sky-400 mb-2">Rappel — Vos motivations (Jour 1)</p>
+            <p id="sos-carottes-txt" class="text-sm italic text-slate-400 leading-relaxed"></p>
+        </div>
+    </section>
+
+    <!-- LES 4 R -->
+    <section id="view-4r" class="space-y-5 dynamic-view hidden">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">En cas de sollicitation</p>
+            <h1 class="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Les 4 R</h1>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-3xl p-5 backdrop-blur-xl">
+            <p class="text-sm text-slate-400 leading-relaxed">En cas de tension, d'envie subite ou de sollicitation extérieure, appliquez immédiatement cette séquence de quatre étapes. Elle vous permet de traverser la pulsion sans y céder, en reprenant le contrôle de façon naturelle.</p>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center flex-shrink-0">
+                    <span class="text-sky-400 font-black text-sm">R1</span>
+                </div>
+                <h2 class="text-base font-bold text-white">Refuser</h2>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">Prenez la décision consciente de <strong class="text-slate-200">refuser</strong> la cigarette au moment même où l'envie apparaît. Ne négociez pas avec la pulsion : dites-lui non fermement, sans hésitation. Ce refus volontaire est le premier signal que vous envoyez à votre inconscient : <em class="text-sky-300">« Je suis libre, je choisis. »</em></p>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">L'envie dure en moyenne 3 à 5 minutes. Savoir qu'elle va passer suffit souvent à la traverser.</p>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center flex-shrink-0">
+                    <span class="text-teal-400 font-black text-sm">R2</span>
+                </div>
+                <h2 class="text-base font-bold text-white">Réviser</h2>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed"><strong class="text-slate-200">Révisez</strong> mentalement vos motivations. Rappelez-vous pourquoi vous avez pris cette décision : votre santé, votre liberté, vos proches, l'argent économisé, le projet que vous financez avec ces économies.</p>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">Visualisez concrètement la version de vous-même dans 6 mois : non-fumeur, plus libre, plus fier. Cette image est un ancrage puissant.</p>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center flex-shrink-0">
+                    <span class="text-violet-400 font-black text-sm">R3</span>
+                </div>
+                <h2 class="text-base font-bold text-white">Respirer</h2>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed"><strong class="text-slate-200">Respirez</strong> en cohérence cardiaque. Inspirez lentement pendant 5 secondes, expirez lentement pendant 5 secondes. Répétez 6 fois (soit 1 minute). Cet exercice régule immédiatement le système nerveux autonome et fait chuter le niveau de cortisol.</p>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">La cigarette était votre façon de « souffler ». La respiration consciente remplit exactement le même rôle, en mieux et sans toxines.</p>
+            <button onclick="switchPage('respiration')" class="mt-3 w-full py-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-300 text-sm font-semibold tracking-wide transition-all hover:bg-violet-500/20 cursor-pointer active:scale-98">
+                Ouvrir l'exercice de respiration →
+            </button>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center flex-shrink-0">
+                    <span class="text-emerald-400 font-black text-sm">R4</span>
+                </div>
+                <h2 class="text-base font-bold text-white">Réhydrater</h2>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed"><strong class="text-slate-200">Réhydratez-vous</strong> avec un grand verre d'eau bu lentement, gorgée par gorgée. L'eau joue un rôle double : elle occupe le geste (porter quelque chose à la bouche) et aide l'organisme à éliminer les toxines résiduelles.</p>
+            <p class="text-sm text-slate-500 mt-2 leading-relaxed">Le tabac déshydrate les tissus et crée une légère confusion entre soif et envie de fumer. L'eau coupe ce circuit.</p>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-900/80 to-slate-950 border border-sky-500/20 rounded-2xl p-5 backdrop-blur-xl">
+            <p class="text-xs font-semibold uppercase tracking-widest text-sky-400 mb-2">À retenir</p>
+            <p class="text-sm text-slate-400 leading-relaxed">Ces 4 R ne demandent pas plus de 2 à 3 minutes. Ils peuvent être pratiqués n'importe où, n'importe quand. Plus vous les appliquez, plus le réflexe de substitution devient automatique — et plus la pulsion diminue en intensité au fil des jours.</p>
+        </div>
+    </section>
+
+</main>
+
+<!-- MODALS -->
+<div id="modal-step1" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-800 p-6 space-y-5 transform translate-y-10 transition-transform duration-300 safe-bottom">
+        <div>
+            <h3 class="text-xl font-bold text-white">Pourquoi cette cigarette ?</h3>
+            <p class="text-xs text-slate-400 mt-1">Identifiez l'intention sous-jacente ou le déclencheur.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Stress">🧠 Stress</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Ennui">⏳ Ennui</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Pause">⏸️ Pause</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Café">☕ Café</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Habitude">🔄 Habitude</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Après repas">🍽️ Après repas</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Social / Amis">👥 Social / Amis</button>
+            <button class="trigger-btn py-3.5 px-4 bg-slate-950 border border-slate-800 rounded-xl text-sm font-medium text-slate-300 hover:border-sky-500/50 active:bg-slate-900 transition-all text-left cursor-pointer" data-trigger="Pulsion forte">⚡ Pulsion forte</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-step2" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-800 p-6 space-y-5 transform translate-y-10 transition-transform duration-300 safe-bottom">
+        <div>
+            <h3 class="text-xl font-bold text-white">Quel est votre ressenti immédiat ?</h3>
+            <p class="text-xs text-slate-400 mt-1">Évaluez votre dépendance vis-à-vis de cette cigarette.</p>
+        </div>
+        <div class="flex flex-col gap-3">
+            <button class="feeling-btn p-4 bg-slate-950 border border-slate-800 hover:border-emerald-500/40 rounded-xl text-sm text-left font-medium text-slate-300 transition-all flex flex-col cursor-pointer" data-feeling="Je peux m'en passer">
+                <span class="text-emerald-400 font-bold mb-0.5">Niveau 1</span>
+                <span class="text-xs text-slate-400">Je peux m'en passer facilement</span>
+            </button>
+            <button class="feeling-btn p-4 bg-slate-950 border border-slate-800 hover:border-amber-500/40 rounded-xl text-sm text-left font-medium text-slate-300 transition-all flex flex-col cursor-pointer" data-feeling="Difficile de m'en passer">
+                <span class="text-amber-400 font-bold mb-0.5">Niveau 2</span>
+                <span class="text-xs text-slate-400">Je ne peux pas encore m'en passer facilement</span>
+            </button>
+            <button class="feeling-btn p-4 bg-slate-950 border border-slate-800 hover:border-rose-500/40 rounded-xl text-sm text-left font-medium text-slate-300 transition-all flex flex-col cursor-pointer" data-feeling="Impossible de m'en passer">
+                <span class="text-rose-400 font-bold mb-0.5">Niveau 3</span>
+                <span class="text-xs text-slate-400">Pour le moment, je ne peux absolument pas m'en passer</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- NAV 4 ONGLETS -->
+<nav id="main-nav" class="fixed bottom-0 left-0 right-0 bg-slate-900/80 border-t border-slate-800/80 backdrop-blur-2xl z-40 safe-bottom hidden">
+    <div class="max-w-md mx-auto flex items-center justify-around h-16 px-2">
+        <button id="nav-suivi" onclick="switchPage('suivi')" class="flex flex-col items-center justify-center px-3 text-sky-400 transition-colors cursor-pointer">
+            <span class="text-[10px] font-bold tracking-widest">SUIVI</span>
+        </button>
+        <button id="nav-programme" onclick="switchPage('programme')" class="flex flex-col items-center justify-center px-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+            <span class="text-[10px] font-bold tracking-widest">PROGRAMME</span>
+        </button>
+        <button id="nav-respiration" onclick="switchPage('respiration')" class="flex flex-col items-center justify-center px-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+            <span class="text-[10px] font-bold tracking-widest">RESPIRATION</span>
+        </button>
+        <button id="nav-4r" onclick="switchPage('4r')" class="flex flex-col items-center justify-center px-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+            <span class="text-[10px] font-bold tracking-widest">LES 4 R</span>
+        </button>
+    </div>
+</nav>
+
+<script>
+const PAGES = ['suivi','programme','respiration','4r'];
+
+let appState = {
+    onboardingComplete: false,
+    dateRdv: "2026-06-02",
+    cigPerDay: 20,
+    paquetPrice: 12.50,
+    validedDays: {},
+    dayData: {},
+    craquages: [
+        { date:"2026-06-03", heure:"14:00", motif:"Habitude", feeling:"Je peux m'en passer", qte:1 },
+        { date:"2026-06-03", heure:"20:00", motif:"Stress",   feeling:"Difficile de m'en passer", qte:1 },
+        { date:"2026-06-04", heure:"09:30", motif:"Habitude", feeling:"Je peux m'en passer", qte:1 }
+    ],
+    breathingCount: 0,
+    lastBreathingDate: ""
+};
+
+let tempRecord = { timestamp:null, trigger:null, feeling:null };
+let chartInstance = null;
+let breathTimer = { intervalId:null, phaseId:null, isActive:false, phase:'inhale', secondsLeft:300 };
+
+function saveState() { localStorage.setItem("inhale_v2_state", JSON.stringify(appState)); }
+
+function loadState() {
+    const saved = localStorage.getItem("inhale_v2_state");
+    if (saved) { try { appState = Object.assign({}, appState, JSON.parse(saved)); } catch(e){} }
+}
+
+// ONBOARDING
+function toggleObBtn(btnId, cb) { document.getElementById(btnId).disabled = !cb.checked; }
+function obNextStep(n) {
+    document.querySelectorAll('[id^="ob-step-"]').forEach(el => el.classList.add('hidden'));
+    document.getElementById('ob-step-' + n).classList.remove('hidden');
+}
+function finishOnboarding() {
+    const d = document.getElementById('init-date-rdv').value;
+    if (!d) { alert("Merci de saisir la date de votre première séance."); return; }
+    appState.dateRdv = d;
+    appState.cigPerDay = parseInt(document.getElementById('init-cig-day').value) || 20;
+    appState.paquetPrice = parseFloat(document.getElementById('init-cig-price').value) || 12.50;
+    appState.onboardingComplete = true;
+    saveState();
+    showMainApp();
+}
+function showMainApp() {
+    document.getElementById('onboarding-screen').style.display = 'none';
+    document.getElementById('main-app').classList.remove('hidden');
+    document.getElementById('main-nav').classList.remove('hidden');
+    updateDashboard();
+    buildAccordion();
+    renderHistorique();
+    initChart();
+    checkBreathReset();
+    restoreDayData();
+}
+
+// NAVIGATION
+function switchPage(id) {
+    PAGES.forEach(p => {
+        document.getElementById('view-' + p).classList.add('hidden');
+        const b = document.getElementById('nav-' + p);
+        if (b) b.className = "flex flex-col items-center justify-center px-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer";
+    });
+    document.getElementById('view-' + id).classList.remove('hidden');
+    const ab = document.getElementById('nav-' + id);
+    if (ab) ab.className = "flex flex-col items-center justify-center px-3 text-sky-400 transition-colors cursor-pointer";
+    if (id === 'suivi') setTimeout(initChart, 60);
+    if (id === 'respiration') chargerSos();
+}
+
+// MODAL
+function openModalStep1() {
+    tempRecord = { timestamp: new Date().toISOString(), trigger:null, feeling:null };
+    toggleModal('modal-step1', true);
+}
+function toggleModal(id, show) {
+    const m = document.getElementById(id);
+    const c = m.firstElementChild;
+    if (show) { m.classList.remove('opacity-0','pointer-events-none'); c.classList.remove('translate-y-10'); }
+    else       { m.classList.add('opacity-0','pointer-events-none');    c.classList.add('translate-y-10'); }
+}
+document.querySelectorAll('.trigger-btn').forEach(btn => btn.addEventListener('click', () => {
+    tempRecord.trigger = btn.getAttribute('data-trigger');
+    toggleModal('modal-step1', false);
+    setTimeout(() => toggleModal('modal-step2', true), 200);
+}));
+document.querySelectorAll('.feeling-btn').forEach(btn => btn.addEventListener('click', () => {
+    tempRecord.feeling = btn.getAttribute('data-feeling');
+    toggleModal('modal-step2', false);
+    addEntry();
+}));
+['modal-step1','modal-step2'].forEach(id => {
+    document.getElementById(id).addEventListener('click', e => {
+        if (e.target === document.getElementById(id)) { toggleModal(id, false); tempRecord = {timestamp:null,trigger:null,feeling:null}; }
+    });
+});
+function addEntry() {
+    const d = new Date(tempRecord.timestamp);
+    appState.craquages.push({
+        date: d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0'),
+        heure: String(d.getHours()).padStart(2,'0')+":"+String(d.getMinutes()).padStart(2,'0'),
+        motif: tempRecord.trigger, feeling: tempRecord.feeling, qte: 1
+    });
+    saveState(); updateDashboard(); renderHistorique(); initChart();
+    tempRecord = {timestamp:null,trigger:null,feeling:null};
+}
+
+// DASHBOARD
+function updateDashboard() {
+    const rdv = new Date(appState.dateRdv+"T00:00:00"), now = new Date();
+    const jours = Math.max(1, Math.ceil((now-rdv)/(86400000)));
+    let total = 0; appState.craquages.forEach(c => total += parseInt(c.qte||1));
+    const evitees = Math.max(0, jours*appState.cigPerDay - total);
+    document.getElementById("stat-evitees").innerText = evitees;
+    document.getElementById("stat-argent").innerText = (evitees*(appState.paquetPrice/20)).toFixed(2)+" €";
+    const todayStr = now.toDateString();
+    const todayCount = appState.craquages.filter(c => new Date(c.date+"T00:00:00").toDateString()===todayStr).reduce((s,c)=>s+parseInt(c.qte||1),0);
+    document.getElementById('global-counter').innerText = todayCount;
+    if (appState.craquages.length > 0) {
+        const last = appState.craquages[appState.craquages.length-1];
+        document.getElementById('last-smoke-time').innerText = "Dernière : "+last.heure;
+    } else { document.getElementById('last-smoke-time').innerText = "Aucune saisie"; }
+}
+function renderHistorique() {
+    const list = document.getElementById('smoke-history-list');
+    if (!appState.craquages.length) {
+        list.innerHTML = '<div class="text-center py-8 border border-dashed border-slate-800 rounded-2xl"><p class="text-xs text-slate-600">Zéro cigarette dans l\'historique.</p></div>';
+        return;
+    }
+    list.innerHTML = [...appState.craquages].reverse().map(c => {
+        let ac = c.feeling && c.feeling.includes("Difficile") ? "text-amber-400" : c.feeling && c.feeling.includes("Impossible") ? "text-rose-400" : "text-emerald-400";
+        return `<div class="flex items-center justify-between p-4 bg-slate-900/50 border border-slate-800/80 rounded-2xl">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-slate-950 flex items-center justify-center border border-slate-800/40 text-xs">🚬</div>
+                <div><p class="text-sm font-semibold text-slate-200">${c.motif||'—'} <span class="text-[10px] font-normal text-slate-500 ml-1">${c.date}</span></p>
+                <p class="text-[11px] ${ac} font-medium mt-0.5">${c.feeling||''}</p></div>
+            </div>
+            <span class="text-xs font-bold font-mono text-slate-500">${c.heure}</span>
+        </div>`;
+    }).join('');
+}
+function clearAllData() {
+    if (!confirm("Réinitialiser tout l'historique ?")) return;
+    appState.craquages = []; saveState(); updateDashboard(); renderHistorique(); initChart();
+}
+
+// CHART
+function initChart() {
+    const ctx = document.getElementById('progressChart'); if (!ctx) return;
+    const map = {}; appState.craquages.forEach(c => { map[c.date]=(map[c.date]||0)+parseInt(c.qte||1); });
+    const rdv = new Date(appState.dateRdv+"T00:00:00"), today = new Date();
+    const labels=[], data=[];
+    for (let d=new Date(rdv); d<=today; d.setDate(d.getDate()+1)) {
+        const s=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
+        labels.push(d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})); data.push(map[s]||0);
+    }
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx, { type:'line', data:{ labels, datasets:[{ data, borderColor:'rgba(56,189,248,0.7)', backgroundColor:'rgba(56,189,248,0.07)', borderWidth:2, tension:0.2, fill:true, pointBackgroundColor:'rgba(56,189,248,0.9)', pointRadius:4, pointBorderColor:'transparent' }] },
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true, ticks:{stepSize:1,color:'#475569',font:{size:10}}, grid:{color:'rgba(148,163,184,0.06)'}, border:{display:false} }, x:{ ticks:{color:'#475569',font:{size:10}}, grid:{display:false}, border:{display:false} } }, plugins:{legend:{display:false}} } });
+}
+
+// PROGRAMME
+function buildAccordion() {
+    const rdv = new Date(appState.dateRdv+"T00:00:00"), auj = new Date();
+    const jourActuel = Math.floor((auj-rdv)/86400000)+1;
+    for (let i=1;i<=7;i++) {
+        const card=document.getElementById("daycard-"+i), badge=document.getElementById("badge-j"+i);
+        if (!card||!badge) continue;
+        if (appState.validedDays[i]) {
+            card.classList.remove("locked"); badge.className="badge-done text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"; badge.innerText="Validé ✓";
+        } else if (i<=jourActuel) {
+            card.classList.remove("locked"); badge.className="badge-todo text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"; badge.innerText=i<jourActuel?"À rattraper":"En cours";
+        } else {
+            card.classList.add("locked"); badge.className="badge-locked text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full"; badge.innerText="Bloqué";
+        }
+    }
+}
+function toggleDay(n) { const c=document.getElementById("daycard-"+n); if(c.classList.contains("locked"))return; c.classList.toggle("open"); }
+function validerJour(n) {
+    const fields={1:['j1-baton','j1-carotte'],3:['j3-montant','j3-projets'],4:['j4-peur','j4-solution'],5:['j5-mensuel'],6:['j6-lettre','j6-sign'],7:['j7-loi']};
+    if (fields[n]) { if(!appState.dayData)appState.dayData={}; appState.dayData[n]={}; fields[n].forEach(id=>{const el=document.getElementById(id);if(el)appState.dayData[n][id]=el.value;}); }
+    appState.validedDays[n]=true; saveState(); buildAccordion(); document.getElementById("daycard-"+n).classList.remove("open");
+}
+function restoreDayData() {
+    if(!appState.dayData)return;
+    Object.keys(appState.dayData).forEach(d=>Object.keys(appState.dayData[d]).forEach(id=>{const el=document.getElementById(id);if(el)el.value=appState.dayData[d][id];}));
+}
+
+// RESPIRATION
+function checkBreathReset() {
+    const t=new Date().toDateString();
+    if(appState.lastBreathingDate!==t){appState.breathingCount=0;appState.lastBreathingDate=t;saveState();}
+    document.getElementById("resp-today-count").innerText=appState.breathingCount;
+}
+function chargerSos() {
+    const txt=appState.dayData&&appState.dayData[1]?appState.dayData[1]['j1-carotte']:'';
+    const box=document.getElementById('sos-review-box');
+    if(txt&&txt.trim()){document.getElementById('sos-carottes-txt').innerText=`"${txt.trim()}"`;box.classList.remove('hidden');}
+    else box.classList.add('hidden');
+}
+function updateTimerDisplay(s) { document.getElementById('timer-display').innerText=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; }
+function toggleBreathing() { breathTimer.isActive?stopBreath():startBreath(); }
+function startBreath() {
+    breathTimer.isActive=true; breathTimer.secondsLeft=parseInt(document.getElementById('duration-slider').value)*60; breathTimer.phase='inhale';
+    document.getElementById('resp-config-card').classList.add('opacity-40','pointer-events-none');
+    document.getElementById('timer-display').classList.remove('opacity-0');
+    const btn=document.getElementById('btn-start-resp');
+    btn.textContent='Interrompre la séance';
+    btn.className="w-full max-w-xs py-4 px-6 rounded-2xl bg-rose-950/30 border border-rose-900/50 text-rose-200 font-semibold text-sm transition-all tracking-wide active:scale-98 shadow-xl cursor-pointer";
+    updateTimerDisplay(breathTimer.secondsLeft);
+    breathTimer.intervalId=setInterval(()=>{breathTimer.secondsLeft--;updateTimerDisplay(breathTimer.secondsLeft);if(breathTimer.secondsLeft<=0)endBreath(true);},1000);
+    const guide=document.getElementById('visual-guide'), txt=document.getElementById('breathing-text');
+    const exec=()=>{
+        if(breathTimer.phase==='inhale'){guide.className="breathing-circle w-16 h-16 rounded-full inhale";txt.innerText="Inspirez lentement...";txt.className="text-lg font-bold tracking-wide text-sky-400 mt-10 h-6 text-center transition-all duration-500";breathTimer.phase='exhale';}
+        else{guide.className="breathing-circle w-16 h-16 rounded-full exhale";txt.innerText="Expirez profondément...";txt.className="text-lg font-bold tracking-wide text-teal-400 mt-10 h-6 text-center transition-all duration-500";breathTimer.phase='inhale';}
+    };
+    exec(); breathTimer.phaseId=setInterval(exec,5000);
+}
+function stopBreath(){endBreath(false);}
+function endBreath(completed) {
+    breathTimer.isActive=false; clearInterval(breathTimer.intervalId); clearInterval(breathTimer.phaseId);
+    document.getElementById('resp-config-card').classList.remove('opacity-40','pointer-events-none');
+    document.getElementById('timer-display').classList.add('opacity-0');
+    document.getElementById('visual-guide').className="breathing-circle w-16 h-16 rounded-full bg-sky-500/20";
+    const txt=document.getElementById('breathing-text'), btn=document.getElementById('btn-start-resp');
+    btn.textContent='Commencer la séance';
+    btn.className="w-full max-w-xs py-4 px-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 text-slate-200 font-semibold text-sm transition-all tracking-wide active:scale-98 shadow-xl cursor-pointer";
+    if(completed){txt.innerText="✨ Félicitations ! Séance validée.";txt.className="text-base font-bold tracking-wide text-emerald-400 mt-10 h-6 text-center";zenBell();appState.breathingCount+=1;appState.lastBreathingDate=new Date().toDateString();saveState();document.getElementById("resp-today-count").innerText=appState.breathingCount;}
+    else{txt.innerText="Séance interrompue.";txt.className="text-sm font-medium tracking-wide text-slate-500 mt-10 h-6 text-center";}
+    breathTimer.phase='inhale'; breathTimer.secondsLeft=parseInt(document.getElementById('duration-slider').value)*60; updateTimerDisplay(breathTimer.secondsLeft);
+}
+function zenBell() {
+    try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C(),now=ctx.currentTime,g=ctx.createGain();g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(0.15,now+2.5);g.gain.exponentialRampToValueAtTime(0.001,now+5.5);g.connect(ctx.destination);[[440,0],[880,0.05],[1320,0.1]].forEach(([f,d])=>{const o=ctx.createOscillator();o.type='sine';o.frequency.setValueAtTime(f,now+d);o.connect(g);o.start(now+d);o.stop(now+6);});}catch(e){}
+}
+document.getElementById('duration-slider').addEventListener('input', e=>{
+    document.getElementById('slider-val').innerText=e.target.value;
+    if(!breathTimer.isActive){breathTimer.secondsLeft=e.target.value*60;updateTimerDisplay(breathTimer.secondsLeft);}
+});
+
+window.onload=function(){loadState();if(appState.onboardingComplete)showMainApp();};
+</script>
+</body>
+</html>
