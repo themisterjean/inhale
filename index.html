@@ -130,6 +130,8 @@
             <input type="number" id="init-cig-day" value="20" min="1" class="dark-input">
             <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Prix moyen d'un paquet de 20 (€)</label>
             <input type="number" id="init-cig-price" value="12.50" step="0.1" class="dark-input">
+            <label class="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1">Date de votre deuxième séance</label>
+            <input type="date" id="init-date-rdv2" class="dark-input">
             <button onclick="finishOnboarding()"
                 class="w-full mt-2 py-4 rounded-2xl bg-gradient-to-r from-sky-500 to-teal-400 text-slate-950 font-bold text-sm tracking-wide shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] transition-all cursor-pointer active:scale-98">
                 Accéder à l'application →
@@ -335,6 +337,12 @@
                 <button onclick="validerJour(7)" class="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500/20 to-teal-500/20 hover:from-sky-500/30 hover:to-teal-500/30 border border-sky-500/30 text-sky-200 text-sm font-semibold tracking-wide transition-all active:scale-98 cursor-pointer">Valider le protocole hebdomadaire ✓</button>
             </div>
         </div>
+
+        <div id="bilan-btn-container" class="hidden">
+            <button onclick="envoyerBilan()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-sky-500 to-teal-400 text-slate-950 font-bold text-sm tracking-wide shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:shadow-[0_0_40px_rgba(56,189,248,0.5)] transition-all cursor-pointer active:scale-98">
+                Envoyer mon bilan à mon thérapeute
+            </button>
+        </div>
     </section>
 
     <!-- RESPIRATION -->
@@ -374,6 +382,31 @@
             <p class="text-xs font-semibold uppercase tracking-widest text-sky-400 mb-2">Rappel — Vos motivations (Jour 1)</p>
             <p id="sos-carottes-txt" class="text-sm italic text-slate-400 leading-relaxed"></p>
         </div>
+    </section>
+
+    <!-- RÉFÉRENCES -->
+    <section id="view-references" class="space-y-5 dynamic-view hidden">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Ressources</p>
+            <h1 class="text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400">Références</h1>
+        </div>
+        <a href="https://www.youtube.com/watch?v=1DFYJQ3OpPU#t=24" target="_blank" rel="noopener noreferrer" class="block bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl active:scale-98 transition-transform">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-rose-400 mb-1">Vidéo YouTube</p>
+            <p class="text-sm font-semibold text-slate-200">Campagne DNF — Ne vous faites pas rouler</p>
+        </a>
+        <a href="https://youtu.be/7kMGLAbVwmM" target="_blank" rel="noopener noreferrer" class="block bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl active:scale-98 transition-transform">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-rose-400 mb-1">Vidéo YouTube</p>
+            <p class="text-sm font-semibold text-slate-200">Interview Dr Khalatbari — tabacologue</p>
+        </a>
+        <a href="https://docs.google.com/document/d/10deeAV80tSp86EA6_vploDaaYqze5KaOhG91AN8Kynw" target="_blank" rel="noopener noreferrer" class="block bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl active:scale-98 transition-transform">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-sky-400 mb-1">Document</p>
+            <p class="text-sm font-semibold text-slate-200">Brochure arrêt tabac</p>
+        </a>
+        <a href="https://drive.google.com/drive/folders/16glxlhMbwFBedr1nsh62ybyrJu0wcrXx" target="_blank" rel="noopener noreferrer" class="block bg-gradient-to-b from-slate-900/80 to-slate-950 border border-slate-800/60 rounded-2xl p-5 backdrop-blur-xl active:scale-98 transition-transform">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-teal-400 mb-1">Dossier Drive</p>
+            <p class="text-sm font-semibold text-slate-200">Dossier ressources complet</p>
+            <p class="text-xs text-slate-500 mt-1">Néonicotinoïdes, communication tabac, documents annexes</p>
+        </a>
     </section>
 
     <!-- LES 4 R -->
@@ -485,6 +518,15 @@
     </div>
 </div>
 
+<!-- MODAL BILAN -->
+<div id="modal-bilan" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="bg-slate-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-slate-800 p-6 space-y-4 transform translate-y-10 transition-transform duration-300 safe-bottom">
+        <h3 class="text-xl font-bold text-white">Bilan prêt</h3>
+        <p class="text-sm text-slate-400 leading-relaxed">Votre thérapeute va le recevoir. Les données ont été compilées avec succès.</p>
+        <button onclick="toggleModal('modal-bilan', false)" class="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-teal-400 text-slate-950 font-bold text-sm tracking-wide transition-all cursor-pointer active:scale-98">Fermer</button>
+    </div>
+</div>
+
 <!-- NAV 4 ONGLETS -->
 <nav id="main-nav" class="fixed bottom-0 left-0 right-0 bg-slate-900/80 border-t border-slate-800/80 backdrop-blur-2xl z-40 safe-bottom hidden">
     <div class="max-w-md mx-auto flex items-center justify-around h-16 px-2">
@@ -500,15 +542,19 @@
         <button id="nav-4r" onclick="switchPage('4r')" class="flex flex-col items-center justify-center px-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
             <span class="text-[10px] font-bold tracking-widest">LES 4 R</span>
         </button>
+        <button id="nav-references" onclick="switchPage('references')" class="flex flex-col items-center justify-center px-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
+            <span class="text-[10px] font-bold tracking-widest">RÉFÉRENCES</span>
+        </button>
     </div>
 </nav>
 
 <script>
-const PAGES = ['suivi','programme','respiration','4r'];
+const PAGES = ['suivi','programme','respiration','4r','references'];
 
 let appState = {
     onboardingComplete: false,
     dateRdv: "2026-06-02",
+    dateRdv2: "",
     cigPerDay: 20,
     paquetPrice: 12.50,
     validedDays: {},
@@ -519,7 +565,8 @@ let appState = {
         { date:"2026-06-04", heure:"09:30", motif:"Habitude", feeling:"Je peux m'en passer", qte:1 }
     ],
     breathingCount: 0,
-    lastBreathingDate: ""
+    lastBreathingDate: "",
+    breathingLogs: []
 };
 
 let tempRecord = { timestamp:null, trigger:null, feeling:null };
@@ -543,6 +590,8 @@ function finishOnboarding() {
     const d = document.getElementById('init-date-rdv').value;
     if (!d) { alert("Merci de saisir la date de votre première séance."); return; }
     appState.dateRdv = d;
+    const d2 = document.getElementById('init-date-rdv2').value;
+    if (d2) appState.dateRdv2 = d2;
     appState.cigPerDay = parseInt(document.getElementById('init-cig-day').value) || 20;
     appState.paquetPrice = parseFloat(document.getElementById('init-cig-price').value) || 12.50;
     appState.onboardingComplete = true;
@@ -559,6 +608,7 @@ function showMainApp() {
     initChart();
     checkBreathReset();
     restoreDayData();
+    updateBilanBtn();
 }
 
 // NAVIGATION
@@ -732,17 +782,48 @@ function endBreath(completed) {
     const txt=document.getElementById('breathing-text'), btn=document.getElementById('btn-start-resp');
     btn.textContent='Commencer la séance';
     btn.className="w-full max-w-xs py-4 px-6 rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 text-slate-200 font-semibold text-sm transition-all tracking-wide active:scale-98 shadow-xl cursor-pointer";
-    if(completed){txt.innerText="✨ Félicitations ! Séance validée.";txt.className="text-base font-bold tracking-wide text-emerald-400 mt-10 h-6 text-center";zenBell();appState.breathingCount+=1;appState.lastBreathingDate=new Date().toDateString();saveState();document.getElementById("resp-today-count").innerText=appState.breathingCount;}
+    if(completed){txt.innerText="✨ Félicitations ! Séance validée.";txt.className="text-base font-bold tracking-wide text-emerald-400 mt-10 h-6 text-center";zenBell();appState.breathingCount+=1;appState.lastBreathingDate=new Date().toDateString();const _now=new Date();if(!appState.breathingLogs)appState.breathingLogs=[];appState.breathingLogs.push({date:_now.getFullYear()+"-"+String(_now.getMonth()+1).padStart(2,'0')+"-"+String(_now.getDate()).padStart(2,'0'),heure:String(_now.getHours()).padStart(2,'0')+":"+String(_now.getMinutes()).padStart(2,'0'),duree_minutes:parseInt(document.getElementById('duration-slider').value)});saveState();document.getElementById("resp-today-count").innerText=appState.breathingCount;}
     else{txt.innerText="Séance interrompue.";txt.className="text-sm font-medium tracking-wide text-slate-500 mt-10 h-6 text-center";}
     breathTimer.phase='inhale'; breathTimer.secondsLeft=parseInt(document.getElementById('duration-slider').value)*60; updateTimerDisplay(breathTimer.secondsLeft);
 }
 function zenBell() {
-    try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const ctx=new C(),now=ctx.currentTime,g=ctx.createGain();g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(0.15,now+2.5);g.gain.exponentialRampToValueAtTime(0.001,now+5.5);g.connect(ctx.destination);[[440,0],[880,0.05],[1320,0.1]].forEach(([f,d])=>{const o=ctx.createOscillator();o.type='sine';o.frequency.setValueAtTime(f,now+d);o.connect(g);o.start(now+d);o.stop(now+6);});}catch(e){}
+  try {
+    const audio = new Audio('bell.wav');
+    audio.volume = 0.4;
+    audio.play();
+  } catch(e) {}
 }
 document.getElementById('duration-slider').addEventListener('input', e=>{
     document.getElementById('slider-val').innerText=e.target.value;
     if(!breathTimer.isActive){breathTimer.secondsLeft=e.target.value*60;updateTimerDisplay(breathTimer.secondsLeft);}
 });
+
+function updateBilanBtn() {
+    const container = document.getElementById('bilan-btn-container');
+    if (!container) return;
+    if (!appState.dateRdv2) { container.classList.add('hidden'); return; }
+    const n = new Date();
+    const todayStr = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+    if (todayStr === appState.dateRdv2) container.classList.remove('hidden');
+    else container.classList.add('hidden');
+}
+function envoyerBilan() {
+    const bilan = {
+        patient: { dateRdv1: appState.dateRdv, dateRdv2: appState.dateRdv2, cigPerDay: appState.cigPerDay, paquetPrice: appState.paquetPrice },
+        defis: {
+            jour1: appState.dayData&&appState.dayData[1]?{baton:appState.dayData[1]['j1-baton'],carotte:appState.dayData[1]['j1-carotte']}:{},
+            jour3: appState.dayData&&appState.dayData[3]?{montant:appState.dayData[3]['j3-montant'],projets:appState.dayData[3]['j3-projets']}:{},
+            jour4: appState.dayData&&appState.dayData[4]?{peur:appState.dayData[4]['j4-peur'],solution:appState.dayData[4]['j4-solution']}:{},
+            jour6: appState.dayData&&appState.dayData[6]?{lettre:appState.dayData[6]['j6-lettre'],sign:appState.dayData[6]['j6-sign']}:{},
+            jour7: appState.dayData&&appState.dayData[7]?{loi:appState.dayData[7]['j7-loi']}:{},
+            joursValides: Object.keys(appState.validedDays||{}).filter(k=>appState.validedDays[k]).map(Number)
+        },
+        craquages: appState.craquages||[],
+        respiration: { totalSessions: appState.breathingCount, logs: appState.breathingLogs||[] }
+    };
+    console.log(JSON.stringify(bilan));
+    toggleModal('modal-bilan', true);
+}
 
 window.onload=function(){loadState();if(appState.onboardingComplete)showMainApp();};
 </script>
