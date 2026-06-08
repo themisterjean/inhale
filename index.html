@@ -197,6 +197,7 @@
             </div>
             <div id="smoke-history-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
         </div>
+        <button onclick="exportData()" class="py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 text-sm w-full cursor-pointer hover:text-slate-200 transition-colors">Exporter mes données</button>
     </section>
 
     <!-- PROGRAMME -->
@@ -699,6 +700,19 @@ function renderHistorique() {
 function clearAllData() {
     if (!confirm("Réinitialiser tout l'historique ?")) return;
     appState.craquages = []; saveState(); updateDashboard(); renderHistorique(); initChart();
+}
+function exportData() {
+  const data = localStorage.getItem('inhale_v2_state');
+  if (!data) { alert('Aucune donnée à exporter.'); return; }
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'inhale-data.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // CHART
